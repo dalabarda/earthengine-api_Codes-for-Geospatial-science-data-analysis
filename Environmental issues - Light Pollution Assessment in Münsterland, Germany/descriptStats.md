@@ -1,72 +1,142 @@
 ```javascript
 
-var muensterland = ee.FeatureCollection('ft:1rS4KW1A2RInPfPJtztIeWzbuGljXiHd97vCYqnKh');
+/////Defining the study area (2 areas of choice)
+//Münsterland administrative region in vector format
+var ROI_1 = ee.FeatureCollection('ft:1xTHdjomV2F5CbAGdAcHl-S5aLdInTEHzXSlAoKVm')
+      .filterMetadata('NAME_2', 'equals', "Munster");
+      
+//Münsterland region in simplified vector format
+var ROI_2 = ee.FeatureCollection('ft:1rS4KW1A2RInPfPJtztIeWzbuGljXiHd97vCYqnKh');
+
+var muensterland = ROI_2; // or ROI_1
+
+Map.centerObject(muensterland, 9);
 Map.addLayer(muensterland, {}, 'Münsterland area');
 
-/////Collection of NightTime VIIRS data /////////////////////////
+/////Data collection and processisng
+//Collection of NightTime VIIRS data
 var viirs_coll = ee.ImageCollection("users/dalabarda/VIIRS");
 
-//Clipping Collection of NightLight Images with muensterland
-var coll_clip = viirs_coll
-    .map(function(coll){
-        return coll.clip(muensterland)}
-        );
-
 // Reducing image stack
-var mean = coll_clip.mean();
+var sum = viirs_coll.sum();
+var max = viirs_coll.max();
+var min = viirs_coll.min();
+var mean = viirs_coll.mean();
+// mean ignoring min and max of the year.
+var mean2 = (sum.select('b1').subtract(min.select('b1'))
+              .subtract(max.select('b1'))).divide(10);
 
-// Define an SLD style of discrete intervals to apply to the image.
-var sld_intervals =
-  '<RasterSymbolizer>' +
-    '<ColorMap  type="intervals" extended="false" >' +
-      '<ColorMapEntry color="#000000" quantity="0" label="0"/>' +
-      '<ColorMapEntry color="#2644a5" quantity="0.3" label="0-0.3" />' +
-      '<ColorMapEntry color="#9ccee3" quantity="0.6" label="0.3-0.6" />' +
-      '<ColorMapEntry color="#99cc00" quantity="1" label="0.6-1" />' +
-      '<ColorMapEntry color="#fef716" quantity="5" label="1-5" />' +
-      '<ColorMapEntry color="#f27901" quantity="15" label="5-15" />' +
-      '<ColorMapEntry color="#ca1c1c" quantity="30" label="15-30" />' +
-      '<ColorMapEntry color="#ffffff" quantity="64" label="30-64" />' +
-    '</ColorMap>' +
-  '</RasterSymbolizer>';
+// selection one of the images reduced
+var img = mean; // sum, max, min, mean or mean2
 
+var mask = img.clip(muensterland)
+              .select(['b1']).lte(64);
 
-// Add the image to the map using both the color ramp and interval schemes.
-Map.addLayer(mean.sldStyle(sld_intervals), {}, 'SLD intervals');
+// Apply the mask to the image.
+var masked = mean.updateMask(mask);
+
+var median = viirs_coll.median();
 
 
-var color = ['2644a5', '9ccee3', '99cc00', 'fef716', 'f27901', 'ca1c1c', 'ffffff'];
-var arr = [[0, 0.3],[0.3, 0.6],[0.6, 1],[1, 5],[5, 15],[15, 30],[30, 64]];
-var count = arr.length;
-//var rivers_image = ee.Image(0).mask(0).toByte();
-var fc = {};
+// collection of 3 images
+var coll =  ee.ImageCollection.fromImages([median, mean, mean2])
 
-for(var i=0; i<count; i++) {
-  var area = ee.Image.constant(10).mask(mean
-             .where(mean.gte(arr[i][1]), 0).where(mean.lt(arr[i][0]), 0));
-             
-   var vec = area.reduceToVectors(null, //reducer- Reducer.countEvery()
-          muensterland, // geometry to reduce in
-          90, //
-          "polygon", // geometry type
-          true, //eight connector 
-         "label", 
-          "EPSG:4326", //projection
-          null, 
-          false, 
-          100000000000, //max number of pixels to reduce over
-          1, //tileScale
-          false //geometryInNativeProjection 
+/*------------------------------------------------*/
+/////////////////////////////////////////////////
+///MEAN IMAGE  TOP 10 BRIGHTEST LOCATIONS////////
+/*------------------------------------------------*/
+// 't' means the threshold value
+var t = 27; //--> 22.2 for 15 points, 25.6 for 10 points
+var decrement = 0.1;
+
+var t0 = t;
+var i = 0;
+var numPlaces = [];
+var VIIRS_thres = [];
+var codeTry_count = 0;
+
+while (i < 10) {
+
+    var area_imageMean = masked
+             .where(masked
+             .lt(t), 0)  
+             ;
+ 
+  var ddmean = ee.Image.constant(10).mask(area_imageMean);
+  var vecMean = ddmean.reduceToVectors(null, //reducer- Reducer.countEvery()
+                    muensterland, // geometry to reduce in
+                    90, //
+                    "polygon", // geometry type
+                    true, //eight connector 
+                   "label", 
+                    "EPSG:4326", //projection
+                    null, 
+                    false, 
+                    100000000000, //max number of pixels to reduce over
+                    1, //tileScale
+                    false //geometryInNativeProjection 
   ).map(function(f) {
-      return ee.Feature(f.buffer(1))
+      return ee.Feature(f.buffer(10))
     });
-
-  var mean_centroids = vec.map(function(feature) {
-    return ee.Feature(feature);
+    
+  var mean_centroids = vecMean.map(function(feature) {
+    return ee.Feature(feature.centroid());
   });
-  //print(mean_centroids);
-  Map.addLayer(vec, {'color': color[i]}, ' Artificial light intensity ranging between  ' + arr[i][0] + ' ‒ ' + arr[i][1] + '  in Nano-Watts.', false);
+
+  var i = mean_centroids.size().toInt().getInfo();
+
+  numPlaces.push(i);
+  VIIRS_thres.push(t);
+  VIIRS_thres;
+  codeTry_count++;
+  t-= decrement; // this happens as long as try was executed
+ 
 }
 
+// Custom function to make the precision of floating points.
+function toFixed(value, precision) {
+    var power = Math.pow(10, precision || 0);
+    return String(Math.round(value * power) / power);
+}
 
+t = toFixed((t + decrement),2); // Just to ajust the last iteraion that dont make the push 
+
+print(t0 + " is the initial threshold value.");
+print('The code attempted ' + codeTry_count + ' times before get the final result.');
+print(i + ' places found!');
+print(t + ' is the image threshold value.');
+
+
+//Creating list with 2 values
+var ar = [numPlaces, VIIRS_thres];
+
+//Convert rows to columns function
+var r = ar[0].map(function(col, i) {
+  return ar.map(function(row) {
+    return row[i];
+  });
+});
+
+//function to display the table into the Console
+function getDataTable(Dict) {
+  var rows = Dict.map(function(v, i) {
+    var min = numPlaces[i] ;
+    return {c: [{v: min}, {v: v}]}
+  });
+  var cols = [
+      {id: 'polynumbers', label: 'Number of Polygons', type: 'number'},
+      {id: 'thres', label: 'VIIRS Threshold', type: 'number'}
+  ];
+  return {cols: cols, rows: rows};
+}
+
+print("Number of Bright Places per Threshold (decreasing 0.1):",
+        Chart(getDataTable(VIIRS_thres), 'Table'));
+
+
+///////////////////////////////////////
+var palette = ['000000,FF0000,FFFF00,FFFF00,FFFFFF,FFFFFF'];
+Map.addLayer(masked, {min:0, max:2, palette:[palette]}, 'Img Mean', false);
+Map.addLayer(vecMean, {'color':'FF0000'}, 'Mean Vector', false);
+addToMap(mean_centroids, {'color':'FF00FF'}, 'Mean Centroid of the BRIGHTEST places');
 ```
