@@ -21,7 +21,7 @@ Google Earth Engine has two fundamental geographic data structures types that yo
 Since Earth Engine is still in beta, there are not billions of [stackoverflow.com](http://stackoverflow.com/) questions and answers to help solve problems once you start trying to use it. Instead, there is a Google group called [Google Earth Engine Developers](https://groups.google.com/forum/#!forum/google-earth-engine-developers) which is full of discussion of how to do different processes. As a beta tester, I had access to this group and found it to be a very valuable resource when I had a question not covered in the basic documentation.
 
 
-
+----------
 ## More from the authors:
 
  * [GeotechSci blog](http://geotech.besaba.com/blog.html)
