@@ -1,3 +1,5 @@
+```javascript
+
 /////Descriptive Statistics - Münsterland
 /////Münsterland region in vector format
 var muensterland = ee.FeatureCollection('ft:1rS4KW1A2RInPfPJtztIeWzbuGljXiHd97vCYqnKh');
@@ -141,3 +143,5 @@ var histogramChartOut =
     Chart.image.histogram(outliers, muensterland, 50, null, 0.00000000001);
 
 print(histogramChartDark, histogramChartLight, histogramChartLight2,histogramChartOut);
+
+```
