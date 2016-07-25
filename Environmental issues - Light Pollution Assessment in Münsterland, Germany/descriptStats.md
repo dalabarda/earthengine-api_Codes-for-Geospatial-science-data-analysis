@@ -46,8 +46,8 @@ var coll =  ee.ImageCollection.fromImages([median, mean, mean2])
 ///MEAN IMAGE  TOP 10 BRIGHTEST LOCATIONS////////
 /*------------------------------------------------*/
 // 't' means the threshold value
-var t = 27; //--> 22.2 for 15 points, 25.6 for 10 points
-var decrement = 0.1;
+var t = 0; //--> 22.2 for 15 points, 25.6 for 10 points
+var decrement = 0.01;
 
 var t0 = t;
 var i = 0;
@@ -59,7 +59,7 @@ while (i < 10) {
 
     var area_imageMean = masked
              .where(masked
-             .lt(t), 0)  
+             .gt(t), 0)  
              ;
  
   var ddmean = ee.Image.constant(10).mask(area_imageMean);
@@ -89,7 +89,7 @@ while (i < 10) {
   VIIRS_thres.push(t);
   VIIRS_thres;
   codeTry_count++;
-  t-= decrement; // this happens as long as try was executed
+  t+= decrement; // this happens as long as try was executed
  
 }
 
