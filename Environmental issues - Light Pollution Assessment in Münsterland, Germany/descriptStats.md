@@ -1,147 +1,72 @@
 ```javascript
 
-/////Descriptive Statistics - Münsterland
-/////Münsterland region in vector format
 var muensterland = ee.FeatureCollection('ft:1rS4KW1A2RInPfPJtztIeWzbuGljXiHd97vCYqnKh');
-Map.centerObject(muensterland, 8);
+Map.addLayer(muensterland, {}, 'Münsterland area');
 
-var buffer = function(feature) {
-  return (feature.geometry()).buffer(100000).bounds();
-};
-
-
-/////Data Collection of Night-time Data (DMSP and VIIRS)
-//// Compute the trend of nighttime lights from DMSP.
-// Add a band containing image date as years since 1991.
-function createTimeBand(img) {
-  var date = img.get('system:time_start');
-  var year = ee.Date(date).get('year').subtract(1991);
-  return ee.Image(year).byte().addBands(img).set('system:time_start', date);
-}
-
-// Fit a linear trend to the nighttime lights collection.
-var collection = ee.ImageCollection('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS')
-    .select('stable_lights')
-    .map(createTimeBand);
-var fit = collection.reduce(ee.Reducer.linearFit());
-
-//Collection of NightTime VIIRS data 
+/////Collection of NightTime VIIRS data /////////////////////////
 var viirs_coll = ee.ImageCollection("users/dalabarda/VIIRS");
 
-
-print(collection);
-print(fit);
-
-//// Display trend in red/blue, brightness in green.
-Map.addLayer(fit.clip(buffer(muensterland)),
-         {min: 0, max: [0.18, 20, -0.18], bands: ['scale', 'offset', 'scale']},
-         'stable lights trend');
-
-// Print a chart and plot a polygon on the map for each region.
-var printRegion = function(region, regionName) {
-  var onlyLights = collection.select(1);
-  var chart = Chart.image.seriesByRegion(onlyLights, region,ee.Reducer.mean(), 
-              'stable_lights', 50, 'system:time_start', 'label');
-            //Chart.image.series(onlyLights, region, ee.Reducer.mean(), 100);
-  var chart = chart.setOptions({
-        title: 'Night-time data over ' + regionName + ' (DMSP-OLS sensor)',
-        vAxis: {title: 'Mean'},
-          lineWidth: 1,
-          pointSize: 4,
-      });
-  var chart = chart.setChartType('ScatterChart');
-      
-  print(chart);
-  Map.addLayer(region, {color: 'FFFFFF'});
-};
-
-printRegion(muensterland, 'Münsterland');
-
-// VIIRS Time series of 2015
-var VIIRSTimeSeries = Chart.image.seriesByRegion(viirs_coll, muensterland,
-    ee.Reducer.mean(), '', 100, 'system:time_start', 'label');
-VIIRSTimeSeries = VIIRSTimeSeries.setChartType('ScatterChart');
-VIIRSTimeSeries = VIIRSTimeSeries.setOptions({
-  title: 'Night Time data over Münsterland (NPP-VIIRS sensor)',
-  vAxis: {
-    title: 'Mean'
-  },
-  lineWidth: 1,
-  pointSize: 4,
- 
-});
-print(VIIRSTimeSeries);
-
-///////CLIPPING/////////////////////////////////////////////
-
-/////Clipping Collection of NightLight Images with muensterland
+//Clipping Collection of NightLight Images with muensterland
 var coll_clip = viirs_coll
     .map(function(coll){
         return coll.clip(muensterland)}
         );
-//reducing the collections
-var count = coll_clip.count();
-var sum = coll_clip.sum();
-var max = coll_clip.max();
-var min = coll_clip.min();
+
+// Reducing image stack
 var mean = coll_clip.mean();
-var median = coll_clip.median();
-// mean ignoring min and max of the year.
-var mean2 = (sum.select('b1').subtract(min.select('b1')).subtract(max.select('b1'))).divide(10);
 
-// collection of 3 images
-var coll =  median.addBands(mean).addBands(mean2);
-print(coll);
-var printVIIRS = function(region, regionName) {
-  
-  var onlyLights = coll.select(1);
-  var chart = Chart.image.seriesByRegion(onlyLights, region,ee.Reducer.mean(), 
-              'stable_lights', 50, 'system:time_start', 'label');
-            //Chart.image.series(onlyLights, region, ee.Reducer.mean(), 100);
-  var chart = chart.setOptions({
-        title: 'Night-time data over ' + regionName + ' (DMSP-OLS sensor)',
-        vAxis: {title: 'Mean'},
-          lineWidth: 1,
-          pointSize: 4,
-      });
-  var chart = chart.setChartType('ScatterChart');
-      
-  print(chart);
-  Map.addLayer(region, {color: 'FFFFFF'});
-};
-//printVIIRS();
+// Define an SLD style of discrete intervals to apply to the image.
+var sld_intervals =
+  '<RasterSymbolizer>' +
+    '<ColorMap  type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#000000" quantity="0" label="0"/>' +
+      '<ColorMapEntry color="#2644a5" quantity="0.3" label="0-0.3" />' +
+      '<ColorMapEntry color="#9ccee3" quantity="0.6" label="0.3-0.6" />' +
+      '<ColorMapEntry color="#99cc00" quantity="1" label="0.6-1" />' +
+      '<ColorMapEntry color="#fef716" quantity="5" label="1-5" />' +
+      '<ColorMapEntry color="#f27901" quantity="15" label="5-15" />' +
+      '<ColorMapEntry color="#ca1c1c" quantity="30" label="15-30" />' +
+      '<ColorMapEntry color="#ffffff" quantity="64" label="30-64" />' +
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
 
-var darkness = mean.mask(mean.lte(1));
-//Map.addLayer(darkness, {min:0, max:1, palette:['000000,FF0000,FFFF00,FFFF00,FFFFFF,FFFFFF']}, 'Darkness');
 
-var lightness = ee.Image(mean.mask(mean.gte(1)));
-lightness = lightness.mask(lightness.lte(10));
-//Map.addLayer(lightness, {min:1, max:10, palette:['000000,FF0000,FFFF00,FFFF00,FFFFFF,FFFFFF']}, 'Lightness');
+// Add the image to the map using both the color ramp and interval schemes.
+Map.addLayer(mean.sldStyle(sld_intervals), {}, 'SLD intervals');
 
-var lightness2 = ee.Image(mean.mask(mean.gte(10)));
-lightness2 = lightness2.mask(lightness2.lte(25));
-//Map.addLayer(lightness2, {min:10, max:25, palette:['000000,FF0000,FFFF00,FFFF00,FFFFFF,FFFFFF']}, 'Lightness2');
 
-var outliers = mean.mask(mean.gte(25));
-//Map.addLayer(outliers, {min:25, max:130, palette:['000000,FF0000,FFFF00,FFFF00,FFFFFF,FFFFFF']}, 'Outliers');
+var color = ['2644a5', '9ccee3', '99cc00', 'fef716', 'f27901', 'ca1c1c', 'ffffff'];
+var arr = [[0, 0.3],[0.3, 0.6],[0.6, 1],[1, 5],[5, 15],[15, 30],[30, 64]];
+var count = arr.length;
+//var rivers_image = ee.Image(0).mask(0).toByte();
+var fc = {};
 
-var histogramChartMean =
-    Chart.image.histogram(mean, muensterland, 50, null, 0.00000000001);
-                          
-print(histogramChartMean);
+for(var i=0; i<count; i++) {
+  var area = ee.Image.constant(10).mask(mean
+             .where(mean.gte(arr[i][1]), 0).where(mean.lt(arr[i][0]), 0));
+             
+   var vec = area.reduceToVectors(null, //reducer- Reducer.countEvery()
+          muensterland, // geometry to reduce in
+          90, //
+          "polygon", // geometry type
+          true, //eight connector 
+         "label", 
+          "EPSG:4326", //projection
+          null, 
+          false, 
+          100000000000, //max number of pixels to reduce over
+          1, //tileScale
+          false //geometryInNativeProjection 
+  ).map(function(f) {
+      return ee.Feature(f.buffer(1))
+    });
 
-var histogramChartDark =
-    Chart.image.histogram(darkness, muensterland, 100, null, 0.01);
+  var mean_centroids = vec.map(function(feature) {
+    return ee.Feature(feature);
+  });
+  //print(mean_centroids);
+  Map.addLayer(vec, {'color': color[i]}, ' Artificial light intensity ranging between  ' + arr[i][0] + ' ‒ ' + arr[i][1] + '  in Nano-Watts.', false);
+}
 
-var histogramChartLight =
-    Chart.image.histogram(lightness, muensterland, 100, null, 0.01);
-
-var histogramChartLight2 =
-    Chart.image.histogram(lightness2, muensterland, 100, null, 0.01);
-
-var histogramChartOut =
-    Chart.image.histogram(outliers, muensterland, 50, null, 0.00000000001);
-
-print(histogramChartDark, histogramChartLight, histogramChartLight2,histogramChartOut);
 
 ```
