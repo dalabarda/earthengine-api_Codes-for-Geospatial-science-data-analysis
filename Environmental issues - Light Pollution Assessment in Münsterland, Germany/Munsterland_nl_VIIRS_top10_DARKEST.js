@@ -45,7 +45,7 @@ var coll =  ee.ImageCollection.fromImages([median, mean, mean2])
 /*------------------------------------------------*/
 // 't' means the threshold value
 var t = 0; //--> 22.2 for 15 points, 25.6 for 10 points
-var decrement = 0.01;
+var increment = 0.01;
 
 var t0 = t;
 var i = 0;
@@ -87,7 +87,7 @@ while (i < 10) {
   VIIRS_thres.push(t);
   VIIRS_thres;
   codeTry_count++;
-  t+= decrement; // this happens as long as try was executed
+  t+= increment; // this happens as long as try was executed
  
 }
 
@@ -97,7 +97,7 @@ function toFixed(value, precision) {
     return String(Math.round(value * power) / power);
 }
 
-t = toFixed((t + decrement),2); // Just to ajust the last iteraion that dont make the push 
+t = toFixed((t + increment),2); // Just to ajust the last iteraion that dont make the push 
 
 print(t0 + " is the initial threshold value.");
 print('The code attempted ' + codeTry_count + ' times before get the final result.');

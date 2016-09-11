@@ -44,7 +44,7 @@ var coll =  ee.ImageCollection.fromImages([median, mean, mean2])
 ///MEAN IMAGE  TOP 10 BRIGHTEST LOCATIONS////////
 /*------------------------------------------------*/
 // 't' means the threshold value
-var t = 26; //--> 22.2 for 15 points, 25.6 for 10 points
+var t = 27; //--> 22.2 for 15 points, 25.6 for 10 points
 var decrement = 0.1;
 
 var t0 = t;
